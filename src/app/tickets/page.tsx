@@ -13,10 +13,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
 import { CreateTicketModal } from "@/components/tickets/CreateTicketModal";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 
 const Tickets = () => {
   const { data, isLoading, isError } = useTickets();
+  const { user } = useCurrentUser();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  const isAgent = user?.role === "AGENT";
 
   if (isLoading) {
     return (
@@ -43,15 +47,19 @@ const Tickets = () => {
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <div>
             <CardTitle className="text-2xl font-bold">
-              Support Tickets
+              {isAgent ? "All Support Tickets" : "My Support Tickets"}
             </CardTitle>
             <CardDescription>
-              Manage and track customer support tickets
+              {isAgent
+                ? "Manage and respond to customer support tickets"
+                : "Track and manage your support requests"}
             </CardDescription>
           </div>
-          <Button onClick={() => setIsCreateModalOpen(true)}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Create Ticket
-          </Button>
+          {!isAgent && (
+            <Button onClick={() => setIsCreateModalOpen(true)}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Create Ticket
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           {data && (
