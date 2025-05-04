@@ -12,6 +12,7 @@ interface User {
 interface LoginCredentials {
   email: string;
   password: string;
+  firstName?: string;
 }
 
 export const useUser = () => {

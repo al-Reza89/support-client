@@ -34,6 +34,7 @@ const SignUp: React.FC = () => {
       email: email,
       password: userPassword,
       confirmPassword: confirmPassword,
+      firstName: data.firstName,
     };
 
     try {

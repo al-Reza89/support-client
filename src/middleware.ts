@@ -26,5 +26,11 @@ export function middleware(request: NextRequest) {
 
 // Configure which routes to run middleware on
 export const config = {
-  matcher: ["/signin", "/signup", "/profile/:path*", "/dashboard/:path*"],
+  matcher: [
+    "/signin",
+    "/signup",
+    "/tickets/:path*",
+    "/profile/:path*",
+    "/dashboard/:path*",
+  ],
 };
