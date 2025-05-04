@@ -1,0 +1,98 @@
+.markdown-overlay {
+  color: transparent;
+  background: transparent;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.markdown-overlay strong,
+.markdown-overlay em,
+.markdown-overlay h1,
+.markdown-overlay h2,
+.markdown-overlay h3,
+.markdown-overlay h4,
+.markdown-overlay h5,
+.markdown-overlay h6,
+.markdown-overlay blockquote,
+.markdown-overlay ol,
+.markdown-overlay ul,
+.markdown-overlay li,
+.markdown-overlay a,
+.markdown-overlay code,
+.markdown-overlay pre {
+  color: rgba(0, 0, 0, 0);
+  text-shadow: 0 0 0 rgba(var(--foreground-rgb), 0.6);
+}
+
+.dark .markdown-overlay strong,
+.dark .markdown-overlay em,
+.dark .markdown-overlay h1,
+.dark .markdown-overlay h2,
+.dark .markdown-overlay h3,
+.dark .markdown-overlay h4,
+.dark .markdown-overlay h5,
+.dark .markdown-overlay h6,
+.dark .markdown-overlay blockquote,
+.dark .markdown-overlay ol,
+.dark .markdown-overlay ul,
+.dark .markdown-overlay li,
+.dark .markdown-overlay a,
+.dark .markdown-overlay code,
+.dark .markdown-overlay pre {
+  text-shadow: 0 0 0 rgba(255, 255, 255, 0.6);
+}
+
+.markdown-overlay strong {
+  font-weight: bold;
+}
+
+.markdown-overlay em {
+  font-style: italic;
+}
+
+.markdown-overlay h1 {
+  font-size: 2em;
+  margin-bottom: 0.5em;
+}
+
+.markdown-overlay h2 {
+  font-size: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+.markdown-overlay h3 {
+  font-size: 1.25em;
+  margin-bottom: 0.5em;
+}
+
+.markdown-overlay ol,
+.markdown-overlay ul {
+  margin-left: 1.5em;
+}
+
+.markdown-overlay ol {
+  list-style-type: decimal;
+}
+
+.markdown-overlay ul {
+  list-style-type: disc;
+}
+
+.markdown-overlay blockquote {
+  border-left: 3px solid hsl(var(--primary));
+  padding-left: 1em;
+  margin-left: 0;
+}
+
+.markdown-overlay pre code {
+  display: block;
+  padding: 0.5em;
+  margin-bottom: 1em;
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 0.25em;
+}
+
+.dark .markdown-overlay pre code {
+  background-color: rgba(255, 255, 255, 0.05);
+}
