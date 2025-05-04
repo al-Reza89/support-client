@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useTickets } from "@/hooks/useTickets";
 import { TicketsTable } from "@/components/ui/TicketsTable";
 import {
@@ -10,9 +10,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { PlusCircle } from "lucide-react";
+import { CreateTicketModal } from "@/components/tickets/CreateTicketModal";
 
 const Tickets = () => {
   const { data, isLoading, isError } = useTickets();
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -36,11 +40,18 @@ const Tickets = () => {
   return (
     <div className="p-6">
       <Card className="bg-white dark:bg-gray-950 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold">Support Tickets</CardTitle>
-          <CardDescription>
-            Manage and track customer support tickets
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <div>
+            <CardTitle className="text-2xl font-bold">
+              Support Tickets
+            </CardTitle>
+            <CardDescription>
+              Manage and track customer support tickets
+            </CardDescription>
+          </div>
+          <Button onClick={() => setIsCreateModalOpen(true)}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Create Ticket
+          </Button>
         </CardHeader>
         <CardContent>
           {data && (
@@ -52,6 +63,11 @@ const Tickets = () => {
           )}
         </CardContent>
       </Card>
+
+      <CreateTicketModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+      />
     </div>
   );
 };
