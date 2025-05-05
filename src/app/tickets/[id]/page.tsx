@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useTicket } from "@/hooks/useTicket";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useTicket, Reply } from "@/hooks/useTicket";
 import {
   Card,
   CardContent,
@@ -12,7 +12,14 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, CheckCircle, Send, XCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle,
+  Send,
+  XCircle,
+  Wifi,
+  WifiOff,
+} from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
@@ -20,8 +27,9 @@ import { useParams } from "next/navigation";
 import { MarkdownEditor } from "@/components/ui/MarkdownEditor";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "react-toastify";
-import { Reply } from "@/hooks/useTicket";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useSocket } from "@/hooks/useSocket";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function TicketDetailPage() {
   const params = useParams();
@@ -31,6 +39,142 @@ export default function TicketDetailPage() {
   const [replyContent, setReplyContent] = useState("");
   const { user } = useCurrentUser();
   const isAgent = user?.role === "AGENT";
+  const {
+    isConnected,
+    connectionError,
+    joinTicketRoom,
+    leaveTicketRoom,
+    onNewReply,
+    onStatusChange,
+    onUserJoined,
+  } = useSocket();
+  const queryClient = useQueryClient();
+  const [localReplies, setLocalReplies] = useState<Reply[]>([]);
+  const repliesRef = useRef<HTMLDivElement>(null);
+  const [lastActivity, setLastActivity] = useState<string | null>(null);
+
+  // Set initial local replies from data
+  useEffect(() => {
+    if (data?.ticket?.replies) {
+      // Create a Map to deduplicate replies by ID
+      const uniqueRepliesMap = new Map();
+
+      // Add existing replies from data
+      data.ticket.replies.forEach((reply) => {
+        uniqueRepliesMap.set(reply.id, reply);
+      });
+
+      // Convert map values back to array
+      setLocalReplies(Array.from(uniqueRepliesMap.values()));
+    }
+  }, [data?.ticket?.replies]);
+
+  // Auto-scroll to bottom of replies when new replies are added
+  useEffect(() => {
+    if (repliesRef.current) {
+      repliesRef.current.scrollTop = repliesRef.current.scrollHeight;
+    }
+  }, [localReplies]);
+
+  // Join the ticket's WebSocket room on component mount
+  useEffect(() => {
+    if (ticketId && isConnected) {
+      joinTicketRoom(ticketId);
+
+      // Listen for real-time updates
+      const removeNewReplyListener = onNewReply(handleNewReply);
+      const removeStatusChangeListener = onStatusChange(
+        handleStatusChangeNotification
+      );
+      const removeUserJoinedListener = onUserJoined(handleUserJoined);
+
+      // Cleanup listeners when component unmounts
+      return () => {
+        leaveTicketRoom(ticketId);
+        removeNewReplyListener();
+        removeStatusChangeListener();
+        removeUserJoinedListener();
+      };
+    }
+  }, [ticketId, isConnected]);
+
+  // Handle user joined notification
+  const handleUserJoined = useCallback((data) => {
+    setLastActivity(
+      `Someone joined the conversation at ${format(
+        new Date(data.timestamp),
+        "HH:mm:ss"
+      )}`
+    );
+    setTimeout(() => setLastActivity(null), 5000); // Clear after 5 seconds
+  }, []);
+
+  // Handle new reply from WebSocket
+  const handleNewReply = useCallback(
+    (replyData) => {
+      // Check if the reply is already in the localReplies array
+      const replyExists = localReplies.some(
+        (reply) => reply.id === replyData.id
+      );
+
+      if (!replyExists) {
+        // Add the new reply to local state immediately for real-time display
+        setLocalReplies((prevReplies) => {
+          // Double-check that we're not adding a duplicate
+          if (prevReplies.some((reply) => reply.id === replyData.id)) {
+            return prevReplies;
+          }
+          return [...prevReplies, replyData];
+        });
+
+        // Also update the react-query cache with the new data
+        queryClient.setQueryData(["ticket", ticketId], (oldData: any) => {
+          if (!oldData) return oldData;
+
+          // Create a deep copy of the old data
+          const newData = JSON.parse(JSON.stringify(oldData));
+
+          // If the reply is not already in the list, add it
+          if (
+            !newData.ticket.replies.some((reply) => reply.id === replyData.id)
+          ) {
+            newData.ticket.replies = [...newData.ticket.replies, replyData];
+          }
+
+          return newData;
+        });
+
+        // Show notification only if the reply is not from the current user
+        if (!user || replyData.author.id !== user.id) {
+          toast.info(`New reply from ${replyData.author.name}`);
+        }
+      }
+    },
+    [localReplies, ticketId, queryClient, user]
+  );
+
+  // Handle status change from WebSocket
+  const handleStatusChangeNotification = useCallback(
+    (statusData) => {
+      const statusText = statusData.status === "CLOSED" ? "closed" : "reopened";
+
+      // Update the react-query cache with the new status
+      queryClient.setQueryData(["ticket", ticketId], (oldData: any) => {
+        if (!oldData) return oldData;
+
+        // Create a copy of the old data
+        const newData = { ...oldData };
+
+        // Update the ticket status
+        newData.ticket.status = statusData.status;
+
+        return newData;
+      });
+
+      toast.info(`This ticket has been ${statusText}`);
+    },
+    [ticketId, queryClient]
+  );
 
   if (isLoading) {
     return (
@@ -64,15 +208,23 @@ export default function TicketDetailPage() {
 
   const handleSubmitReply = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Make sure there's content to submit
     if (!replyContent.trim()) {
       toast.error("Reply cannot be empty");
       return;
     }
 
     try {
-      await addReply.mutateAsync({ content: replyContent });
+      const result = await addReply.mutateAsync({ content: replyContent });
+
+      // Clear the input field first to prevent double submission
       setReplyContent("");
-      toast.success("Reply added successfully");
+
+      // If we got a result back, add the reply to UI
+      if (result?.data) {
+        handleNewReply(result.data);
+      }
     } catch (error) {
       toast.error("Failed to add reply");
       console.error(error);
@@ -110,14 +262,35 @@ export default function TicketDetailPage() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <div className="mb-4">
+      <div className="mb-4 flex justify-between items-center">
         <Link href="/tickets">
           <Button variant="outline">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Tickets
           </Button>
         </Link>
+
+        {/* Real-time connection status */}
+        <div className="flex items-center gap-2 text-sm">
+          {isConnected ? (
+            <div className="flex items-center text-green-600 dark:text-green-400">
+              <Wifi className="h-4 w-4 mr-1" />
+              <span>Real-time active</span>
+            </div>
+          ) : (
+            <div className="flex items-center text-red-600 dark:text-red-400">
+              <WifiOff className="h-4 w-4 mr-1" />
+              <span>{connectionError || "Not connected"}</span>
+            </div>
+          )}
+        </div>
       </div>
+
+      {lastActivity && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded mb-4 text-sm text-center">
+          {lastActivity}
+        </div>
+      )}
 
       <Card className="mb-6 bg-white dark:bg-gray-950 shadow-sm">
         <CardHeader>
@@ -194,15 +367,22 @@ export default function TicketDetailPage() {
           </div>
 
           {/* Display replies */}
-          {ticket.replies && ticket.replies.length > 0 && (
+          {localReplies.length > 0 && (
             <div className="mt-8">
               <h3 className="text-lg font-semibold mb-4">Replies</h3>
-              <div className="space-y-4">
-                {ticket.replies.map((reply) => (
+              <div
+                ref={repliesRef}
+                className="space-y-4 max-h-[500px] overflow-y-auto pr-2"
+              >
+                {localReplies.map((reply) => (
                   <div
                     key={reply.id}
                     className={`flex gap-4 items-start border p-4 rounded-lg ${
                       isFromTicketCreator(reply) ? "ml-0" : "ml-8"
+                    } ${
+                      reply.author.role === "AGENT"
+                        ? "bg-blue-50 dark:bg-blue-900/20"
+                        : ""
                     }`}
                   >
                     <Avatar className="h-10 w-10">
@@ -269,7 +449,9 @@ export default function TicketDetailPage() {
               <div className="flex justify-end">
                 <Button
                   type="submit"
-                  disabled={addReply.isPending || !replyContent.trim()}
+                  disabled={
+                    addReply.isPending || !replyContent.trim() || !isConnected
+                  }
                   className="flex items-center gap-2"
                 >
                   {addReply.isPending ? "Submitting..." : "Submit Reply"}
