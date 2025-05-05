@@ -28,7 +28,13 @@ const UserMenu = () => {
       <DropdownMenuLabel>{user ? user.name : "User"}</DropdownMenuLabel>
       <DropdownMenuSeparator />
       <DropdownMenuItem>Profile</DropdownMenuItem>
-      <DropdownMenuItem>Tickets</DropdownMenuItem>
+      <DropdownMenuItem
+        onClick={() => {
+          router.push("/tickets");
+        }}
+      >
+        Tickets
+      </DropdownMenuItem>
       <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
     </DropdownMenuContent>
   );
